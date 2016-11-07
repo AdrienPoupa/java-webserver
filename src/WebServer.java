@@ -10,6 +10,8 @@ public final class WebServer
     public static void main(String argv[])
         throws Exception
     {
+
+        System.out.println("Starting web server, listening on port 6789 ...");
         // Set the port number
         int port = 6789;
 
