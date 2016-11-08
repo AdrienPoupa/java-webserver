@@ -1,12 +1,9 @@
-/**
- * Created by Adrien on 28/10/2016.
- */
 import java.io.*;
 import java.net.*;
 import java.util.*;
 final class HttpRequest implements Runnable {
-    final static String CRLF = "\r\n";
-    Socket socket;
+    private final static String CRLF = "\r\n";
+    private Socket socket;
 
     //Constructor
     public HttpRequest(Socket socket) throws Exception {
@@ -17,16 +14,14 @@ final class HttpRequest implements Runnable {
     public void run() {
         try {
             processRequest();
-
         } catch (Exception e) {
-            System.out.println(e);
-            // e.printStackTrace();
+            System.out.println(e.toString());
         }
     }
 
     private static String contentType(String filename) {
         // for html file
-        if (filename.endsWith(".htm")) {
+        if (filename.endsWith(".htm") || filename.endsWith(".html")) {
             return "text/html";
         }
 
@@ -35,10 +30,17 @@ final class HttpRequest implements Runnable {
             return "image/gif";
         }
 
-        // Mime type of JPEG files
-        if (filename.endsWith(".jpg")) {
+        // Mime type of PNG files
+        if (filename.endsWith(".png")) {
+            return "image/png";
+        }
+
+        // Mime type of JPEG files, matches jpg and jpeg extensions
+        if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) {
             return "image/jpeg";
         }
+
+        // default: application/octet-stream
         return "application/octet-stream";
 
     }
@@ -71,40 +73,43 @@ final class HttpRequest implements Runnable {
         System.out.println(requestLine);
 
         // Get and display the header lines
-        String headerline = null;
-        while ((headerline = br.readLine()).length() != 0) {
-            System.out.println(headerline);
+        String headerLine;
+        while ((headerLine = br.readLine()).length() != 0) {
+            System.out.println(headerLine);
         }
 
         // Extract the filename from the request line
         StringTokenizer tokens = new StringTokenizer(requestLine);
-        tokens.nextToken(); // Skip over the method, which shoud be "GET"
-        String filename = tokens.nextToken();
+        tokens.nextToken(); // Skip over the method, which should be "GET"
+        String fileName = tokens.nextToken(); // Get the filename
 
-        if (filename.equals("/")) {
-            filename = "/home.htm";
+        // Make sure to display the correct index page
+        if (fileName.equals("/")) {
+            fileName = "/home.htm";
         }
 
         // Prepend a "." so that file request is within the current directory
-        filename = "." + filename;
+        fileName = "." + fileName;
 
         // Open the request file.
         FileInputStream fis = null;
         boolean fileExists = true;
         try {
-            fis = new FileInputStream(filename);
+            fis = new FileInputStream(fileName);
         } catch (FileNotFoundException e) {
-            fileExists = false;
+            fileExists = false; // If we have caught an exception, the file doesn't exist
         }
 
-        // Constructs the response message
-        String statusLine = null;
-        String contentTypeLine = null;
-        String entityBody = null;
+        // Construct the response message
+        String statusLine = null; // HTTP header with code
+        String contentTypeLine = null; // Content-type such as HTML, JPG...
+        String entityBody = null; // The content itself, either the bytes or the HTML code
+        // If file exists, send the header code 200 ans display the file itself
         if (fileExists) {
             statusLine = "HTTP/1.0 200 OK" + CRLF;
-            contentTypeLine = "Content-type: " + contentType(filename) + CRLF;
+            contentTypeLine = "Content-type: " + contentType(fileName) + CRLF;
         }
+        // Otherwise, "throw" an error into the HTML and display it
         else {
             statusLine = "HTTP/1.0 404 Not Found" + CRLF;
             contentTypeLine = "Content-type: text/html" + CRLF;
@@ -128,6 +133,7 @@ final class HttpRequest implements Runnable {
         // Send the entity body
         if (fileExists) {
             try {
+                // Try to send the data, only if the file exists
                 sendBytes(fis, os);
             } catch (Exception e) {
                 statusLine = "HTTP/1.0 500 Internal Error" + CRLF;
@@ -142,10 +148,12 @@ final class HttpRequest implements Runnable {
                         "</html>";
                 os.writeBytes(entityBody);
             } finally {
+                // Close the file input stream once we're done
                 fis.close();
             }
         }
         else {
+            // Write the "Not found" HTML code
             os.writeBytes(entityBody);
         }
 
